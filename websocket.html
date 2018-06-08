@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Socket</title>
+</head>
+<script type="text/javascript">
+var ws
+function startWS() {
+    console.log('start once again');
+//    ws = new WebSocket("ws://echo.websocket.org");
+    ws = new WebSocket("ws://127.0.0.1:9999")
+    ws.onopen = function (msg) {
+        console.log('websocket opened');
+    }
+    ws.onmessage = function (message) {
+        document.getElementById("chat").value = message.data
+        console.log('websocket msg');
+    }
+    ws.onerror = function (error) {
+        console.log('websocket error');
+    }
+    ws.onclose = function () {
+        ws.send('websocket closed');
+    }
+}
+function sendMessage() {
+    console.log("sending message");
+    ws.send("啦啦啦啦啦啦")
+}
+</script>
+<body>
+<button onclick="startWS()">创建websocket</button>
+<button onclick="sendMessage()">发送消息</button>
+<input type="text" name="chat" id="chat" readonly>
+</body>
+</html>

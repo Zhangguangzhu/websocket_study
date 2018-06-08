@@ -1,6 +1,40 @@
 # -*- coding: utf-8 -*-
 import struct, socket, threading, hashlib, base64, queue
 
+import time
+
+clientList = {}
+
+
+def packData(message):
+	# 先添加第一个字节\x81
+	header = bytes()
+	lenth = len(message.encode())
+	header += struct.pack('B', 129)
+	# 判断数据长度，并添加
+	if lenth <= 125:
+		header += struct.pack('B', lenth)
+	elif lenth <= 65535:
+		header += struct.pack('B', 126)
+		header += struct.pack('!H', lenth)
+	elif lenth <= (2 ^ 64 - 1):
+		header += struct.pack('B', 127)
+		header += struct.pack('!Q', lenth)
+	else:
+		print('msg too long')
+		return
+	return header + bytes(message, encoding='utf-8')
+
+
+def sendmessage(clientsocket, message):
+	msg = packData(message)
+	clientsocket.send(msg)
+
+def boardcast(message):
+	msg = packData(message)
+	for client in clientList:
+		client.send(msg)
+
 class Websocket(threading.Thread):
 
 	def __init__(self, clientsocket, q):
@@ -13,7 +47,9 @@ class Websocket(threading.Thread):
 		enstring = b''
 		cnstringlist = []
 		cnstring = ''
-		if data[0] == 0x88:
+		if len(data) < 6:
+			return ''
+		elif data[0] == 0x88:
 			return ''
 		else:
 			res = data[1] & 0x7f
@@ -45,28 +81,6 @@ class Websocket(threading.Thread):
 				finalstr = enstring.decode()
 			return finalstr
 
-	def packData(self, message):
-		#先添加第一个字节\x81
-		header = bytes()
-		lenth = len(message.encode())
-		header += struct.pack('B', 129)
-		#判断数据长度，并添加
-		if lenth <= 125:
-			header += struct.pack('B', lenth)
-		elif lenth <= 65535:
-			header += struct.pack('B', 126)
-			header += struct.pack('!H', lenth)
-		elif lenth <= (2 ^ 64 - 1):
-			header += struct.pack('B', 127)
-			header += struct.pack('!Q', lenth)
-		else:
-			print('msg too long')
-			return
-		return header + bytes(message, encoding='utf-8')
-
-	def sendmessage(self, message):
-		msg = self.packData(message)
-		self.clientsocket.send(msg)
 
 	def handshaken(self):
 		headers = {}
@@ -96,7 +110,8 @@ class Websocket(threading.Thread):
 				break
 			else:
 				print(msgData)
-				self.sendmessage('哈喽')
+				# sendmessage(self.clientsocket, msgData)
+				self.q.put(msgData)
 
 class WebsocketServer(object):
 
@@ -106,20 +121,29 @@ class WebsocketServer(object):
 		self.SerSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.SerSocket.bind((self.Host, self.Port))
 		self.SerSocket.listen(5)
-		self.clientList = {}
+		# self.clientList = {}
 		self.q = queue.Queue()
 
+	def watchclient(self):
+		while True:
+			time.sleep(1)
+			if not self.q.empty():
+				data = self.q.get()
+				print(type(data))
+				if isinstance(data, socket.socket):
+					del clientList[data]
+				else:
+					boardcast(data)
+
 	def start(self):
+		watchThread = threading.Thread(target=self.watchclient)
+		watchThread.start()
 		print('waiting for connection!')
-		if not self.q.empty():
-			clientinfo = self.q.get()
-			# print('quit:', self.clientList[clientinfo])
-			del self.clientList[clientinfo]
-		print('online num: %s' % len(self.clientList))
+		print('online num: %s' % len(clientList))
 		clientsocket, clientaddr = self.SerSocket.accept()
 		print('connection from %s:%s' % (clientaddr[0], clientaddr[1]))
 		clientThread = Websocket(clientsocket, self.q)
-		self.clientList[clientsocket] = clientaddr
+		clientList[clientsocket] = clientaddr
 		clientThread.start()
 
 

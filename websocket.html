@@ -14,7 +14,7 @@ function startWS() {
         console.log('websocket opened');
     }
     ws.onmessage = function (message) {
-        document.getElementById("chat").value = message.data
+        document.getElementById("view").value = message.data
         console.log('websocket msg');
     }
     ws.onerror = function (error) {
@@ -25,13 +25,14 @@ function startWS() {
     }
 }
 function sendMessage() {
-    console.log("sending message");
-    ws.send("啦啦啦啦啦啦")
+    var input = document.getElementById("chat");
+    ws.send(input.value);
 }
 </script>
 <body>
 <button onclick="startWS()">创建websocket</button>
+<input type="text" name="view" id="view" readonly>
+<input type="text" name="chat" id="chat">
 <button onclick="sendMessage()">发送消息</button>
-<input type="text" name="chat" id="chat" readonly>
 </body>
 </html>
